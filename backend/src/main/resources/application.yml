@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: vms-backend
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 0
+      connection-timeout: 30000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+server:
+  address: 0.0.0.0
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+vms:
+  jwt:
+    secret-base64: ${JWT_SECRET}
+    issuer: vms-api
+    ttl-minutes: 120
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
