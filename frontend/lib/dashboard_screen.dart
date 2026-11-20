@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:material_ui/material_ui.dart';
 
 import 'api.dart';
@@ -13,14 +12,12 @@ const _muted = Color(0xFF647368);
 const _border = Color(0xFFE4E9E2);
 const _panel = Color(0xFFF1F2EE);
 const _amber = Color(0xFFE4A62A);
-const _blue = Color.fromARGB(255, 1, 106, 253);
 
-const _pageSize = 5;
-const _registryMaxWidth = 750.0;
+const _pageSize = 8;
 const _colCheck = 42.0;
 const _colGap = 8.0;
 const _colVehicle = 175.0;
-const _colPlate = 275.0;
+const _colPlate = 325.0;
 const _colStatus = 60.0;
 
 /// Desktop-first dashboard. Uses the existing authenticated API and retains
@@ -245,20 +242,15 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final outer = constraints.maxWidth >= 1200 ? 22.0 : 13.0;
-            final layoutWidth = math.min(
-              1440.0,
-              math.max(0.0, constraints.maxWidth - outer * 2),
-            );
-            final sidebarWidth = (layoutWidth * 0.225).clamp(205.0, 284.0);
-            final drawerWidth = (layoutWidth * 0.46).clamp(355.0, 480.0);
+            final outer = constraints.maxWidth >= 1200 ? 18.0 : 12.0;
+            final layoutWidth = math.max(0.0, constraints.maxWidth - outer * 2);
+            final sidebarWidth = (layoutWidth * 0.19).clamp(205.0, 270.0);
             final gutter = layoutWidth >= 1150 ? 20.0 : 12.0;
-            final availableForRight = math.max(
-              0.0,
-              layoutWidth - sidebarWidth - gutter,
-            );
-            final showWorkArea =
-                availableForRight >= _registryMaxWidth + gutter + 80;
+            final showWorkArea = layoutWidth >= 1080;
+            final workWidth = showWorkArea
+                ? (layoutWidth * 0.28).clamp(330.0, 430.0)
+                : 0.0;
+            final narrow = layoutWidth < 1170;
 
             return Center(
               child: SizedBox(
@@ -266,86 +258,198 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 14),
-                    _FloatingNavigation(
-                      user: widget.session,
-                      onLogout: widget.onLogout,
-                      onDashboard: () => _reload(page: 0),
-                      onRegistry: _closeVehicle,
+                    Text(
+                      'Stark   Group   LTD.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.greatVibes(
+                        color: _pine,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 3,
+                      ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 60),
                     Expanded(
                       child: ClipRect(
-                        child: Stack(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: sidebarWidth,
-                                  child: _DashboardSidebar(
-                                    session: widget.session,
-                                    summary: _summary,
-                                    loading: _loading && _summary == null,
-                                  ),
-                                ),
-                                SizedBox(width: gutter),
-                                if (showWorkArea) ...[
-                                  SizedBox(
-                                    width: _registryMaxWidth,
-                                    child: _mainContent(items, layoutWidth),
-                                  ),
-                                  SizedBox(width: gutter),
-                                  // Reserved space to the right of the vehicle list
-                                  // for your additional widgets/features.
-                                  const Expanded(child: SizedBox.expand()),
-                                ] else
-                                  Expanded(
-                                    child: _mainContent(items, layoutWidth),
-                                  ),
-                              ],
-                            ),
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                ignoring: !_drawerOpen,
-                                child: AnimatedOpacity(
-                                  opacity: _drawerOpen ? 1 : 0,
-                                  duration: const Duration(milliseconds: 260),
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: _closeVehicle,
-                                    child: Container(
-                                      color: _pine.withValues(alpha: .20),
-                                    ),
-                                  ),
+                            SizedBox(
+                              width: sidebarWidth,
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: _DashboardSidebar(
+                                  summary: _summary,
+                                  loading: _loading && _summary == null,
                                 ),
                               ),
                             ),
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 380),
-                              curve: Curves.easeOutCubic,
-                              right: _drawerOpen ? 0 : -drawerWidth - 4,
-                              top: 0,
-                              bottom: 0,
-                              width: drawerWidth,
-                              child: _drawerVehicle == null
-                                  ? const SizedBox.shrink()
-                                  : _VehicleDetailsDrawer(
-                                      key: ValueKey(_drawerVehicle!.id),
-                                      vehicle: _drawerVehicle!,
-                                      onClose: _closeVehicle,
-                                      onEdit: _archiving
-                                          ? null
-                                          : () => _editVehicle(_drawerVehicle),
-                                      onArchive: _archiving
-                                          ? null
-                                          : () => _archive([_drawerVehicle!]),
+                            SizedBox(width: gutter),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: _mainContent(items, layoutWidth),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      narrow ? 4 : 8,
+                                      0,
+                                      narrow ? 4 : 8,
+                                      18,
                                     ),
+                                    child: Center(
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 580,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(31),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: _pine.withValues(
+                                                        alpha: .20,
+                                                      ),
+                                                      blurRadius: 28,
+                                                      spreadRadius: 1,
+                                                      offset: const Offset(
+                                                        0,
+                                                        12,
+                                                      ),
+                                                    ),
+                                                    BoxShadow(
+                                                      color: Colors.black
+                                                          .withValues(
+                                                            alpha: .06,
+                                                          ),
+                                                      blurRadius: 10,
+                                                      offset: const Offset(
+                                                        0,
+                                                        4,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: _FloatingNavigation(
+                                                  user: widget.session,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            _SignOutButton(
+                                              onPressed: widget.onLogout,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            if (showWorkArea) ...[
+                              SizedBox(width: gutter),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 380),
+                                curve: Curves.easeOutCubic,
+                                width: workWidth,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 260),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  child: _drawerOpen && _drawerVehicle != null
+                                      ? TweenAnimationBuilder<double>(
+                                          key: ValueKey(
+                                            'drawer-${_drawerVehicle!.id}',
+                                          ),
+                                          tween: Tween(begin: 1, end: 0),
+                                          duration: const Duration(
+                                            milliseconds: 380,
+                                          ),
+                                          curve: Curves.easeOutCubic,
+                                          builder: (context, progress, child) {
+                                            return Transform.translate(
+                                              offset: Offset(-progress * 38, 0),
+                                              child: Opacity(
+                                                opacity: 1 - progress,
+                                                child: child,
+                                              ),
+                                            );
+                                          },
+                                          child: Stack(
+                                            children: [
+                                              Positioned(
+                                                left: 0,
+                                                top: 112,
+                                                child: Container(
+                                                  width: 18,
+                                                  height: 30,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius:
+                                                        const BorderRadius.only(
+                                                          topLeft:
+                                                              Radius.circular(
+                                                                8,
+                                                              ),
+                                                          bottomLeft:
+                                                              Radius.circular(
+                                                                8,
+                                                              ),
+                                                        ),
+                                                    border: Border.all(
+                                                      color: _border,
+                                                    ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.chevron_left_rounded,
+                                                    size: 17,
+                                                    color: forest,
+                                                  ),
+                                                ),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  left: 10,
+                                                  bottom: 14,
+                                                ),
+                                                child: _VehicleDetailsDrawer(
+                                                  key: ValueKey(
+                                                    _drawerVehicle!.id,
+                                                  ),
+                                                  vehicle: _drawerVehicle!,
+                                                  onClose: _closeVehicle,
+                                                  onEdit: _archiving
+                                                      ? null
+                                                      : () => _editVehicle(
+                                                          _drawerVehicle,
+                                                        ),
+                                                  onArchive: _archiving
+                                                      ? null
+                                                      : () => _archive([
+                                                          _drawerVehicle!,
+                                                        ]),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : const SizedBox.expand(
+                                          key: ValueKey('blank-workspace'),
+                                        ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
                   ],
                 ),
               ),
@@ -366,26 +470,11 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
         pageItems.isNotEmpty && selectedOnPage.length == pageItems.length;
     final partiallySelected = selectedOnPage.isNotEmpty && !allSelected;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(narrow ? 4 : 8, 2, narrow ? 4 : 8, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Fleet dashboard',
-            style: GoogleFonts.spaceGrotesk(
-              fontSize: narrow ? 28 : 36,
-              fontWeight: FontWeight.bold,
-              height: 1.1,
-              letterSpacing: -.75,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Manage every vehicle from one clear workspace.',
-            style: TextStyle(color: _muted, fontSize: 13),
-          ),
-          const SizedBox(height: 14),
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -405,21 +494,24 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Vehicle registry',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 19,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             'Select a vehicle to open its full details.',
-                            style: TextStyle(color: _muted, fontSize: 12),
+                            style: GoogleFonts.spaceGrotesk(
+                              color: _muted,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -506,10 +598,7 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
                 ),
                 const SizedBox(height: 6),
                 if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 82),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
+                  const _RegistrySkeleton()
                 else if (pageItems.isEmpty)
                   const _EmptyRegistry()
                 else
@@ -546,139 +635,215 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
   }
 }
 
+class _SkeletonBox extends StatelessWidget {
+  final double width;
+  final double height;
+  final double radius;
+
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7ECE7),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+class _RegistrySkeleton extends StatelessWidget {
+  const _RegistrySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(5, (index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 7),
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFBF9),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: _border),
+            ),
+            child: const Row(
+              children: [
+                _SkeletonBox(width: 18, height: 18, radius: 5),
+                SizedBox(width: 18),
+                _SkeletonBox(width: 130, height: 12),
+                SizedBox(width: 18),
+                _SkeletonBox(width: 150, height: 12),
+                Spacer(),
+                _SkeletonBox(width: 58, height: 22, radius: 11),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _SignOutButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  const _SignOutButton({required this.onPressed});
+
+  @override
+  State<_SignOutButton> createState() => _SignOutButtonState();
+}
+
+class _SignOutButtonState extends State<_SignOutButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: _hovered ? accent : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _hovered ? accent : accent.withValues(alpha: .35),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _hovered
+                  ? accent.withValues(alpha: .30)
+                  : _pine.withValues(alpha: .12),
+              blurRadius: _hovered ? 18 : 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: IconButton(
+          tooltip: 'Sign out',
+          onPressed: widget.onPressed,
+          style: IconButton.styleFrom(
+            foregroundColor: _hovered ? Colors.white : accent,
+            shape: const CircleBorder(),
+          ),
+          icon: const Icon(Icons.logout_rounded, size: 21),
+        ),
+      ),
+    );
+  }
+}
+
 class _FloatingNavigation extends StatelessWidget {
   final AuthSession user;
-  final VoidCallback onLogout, onDashboard, onRegistry;
-
-  const _FloatingNavigation({
-    required this.user,
-    required this.onLogout,
-    required this.onDashboard,
-    required this.onRegistry,
-  });
+  const _FloatingNavigation({required this.user});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, c) {
-        final compact = c.maxWidth < 1030;
+        final compact = c.maxWidth < 550;
         return Container(
-          height: 68,
+          height: 62,
           padding: EdgeInsets.symmetric(horizontal: compact ? 13 : 20),
           decoration: BoxDecoration(
-            color: _pine,
-            borderRadius: BorderRadius.circular(38),
+            color: _pine.withValues(alpha: .88),
+            borderRadius: BorderRadius.circular(31),
+            border: Border.all(color: Colors.white.withValues(alpha: .10)),
             boxShadow: [
               BoxShadow(
-                color: _pine.withValues(alpha: .23),
-                blurRadius: 25,
-                offset: const Offset(0, 11),
+                color: _pine.withValues(alpha: .16),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Row(
             children: [
-              Container(
-                width: 39,
-                height: 39,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF087B5D),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: const Icon(
-                  Icons.directions_car_filled_rounded,
-                  color: Colors.white,
-                  size: 23,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'lib/assets/app_icon.png',
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(width: 11),
-              const Text(
-                'Stark Group',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.35,
-                ),
-              ),
-              SizedBox(width: compact ? 16 : 30),
-              _NavLink(label: 'Dashboard', active: true, onTap: onDashboard),
-              const SizedBox(width: 6),
+              const SizedBox(width: 12),
               if (!compact)
-                _NavLink(label: 'Vehicles', active: false, onTap: onRegistry),
-              const Spacer(),
-              if (!compact) ...[
-                const Icon(
-                  Icons.shield_outlined,
-                  size: 16,
-                  color: Color(0xFF88B99B),
-                ),
-                const SizedBox(width: 7),
                 const Text(
-                  'Secure workspace',
-                  style: TextStyle(color: Color(0xFFB6C8BC), fontSize: 12),
-                ),
-                const SizedBox(width: 24),
-              ],
-              PopupMenuButton<String>(
-                tooltip: 'Account menu',
-                onSelected: (value) {
-                  if (value == 'signout') onLogout();
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem<String>(
-                    enabled: false,
-                    child: Text(user.email, overflow: TextOverflow.ellipsis),
+                  'Vehicle Management System',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem<String>(
-                    value: 'signout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout_rounded, size: 19),
-                        SizedBox(width: 10),
-                        Text('Sign out'),
-                      ],
-                    ),
-                  ),
-                ],
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!compact) ...[
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 145),
-                        child: Text(
-                          user.fullName,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 9),
-                    ],
-                    CircleAvatar(
-                      backgroundColor: forest,
-                      radius: 19,
-                      child: Text(
-                        _initials(user.fullName),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    const Icon(
-                      Icons.keyboard_arrow_down_rounded,
+                )
+              else
+                const Expanded(
+                  child: Text(
+                    'Vehicle Management System',
+                    style: TextStyle(
                       color: Colors.white,
-                      size: 19,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              if (!compact) const Spacer(),
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      user.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFC8D7CD),
+                        fontSize: 10.5,
+                      ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              CircleAvatar(
+                backgroundColor: Colors.white.withValues(alpha: .12),
+                radius: 17,
+                child: Text(
+                  _initials(user.fullName),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
                 ),
               ),
             ],
@@ -701,229 +866,90 @@ String _initials(String name) {
       .toUpperCase();
 }
 
-class _NavLink extends StatefulWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _NavLink({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  State<_NavLink> createState() => _NavLinkState();
-}
-
-class _NavLinkState extends State<_NavLink> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 190),
-        transform: Matrix4.translationValues(0, _hover ? -2 : 0, 0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          color: widget.active
-              ? ivory
-              : _hover
-              ? Colors.white.withValues(alpha: .12)
-              : Colors.transparent,
-          boxShadow: _hover
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: .18),
-                    blurRadius: 13,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: widget.onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 11),
-            child: Text(
-              widget.label,
-              style: TextStyle(
-                color: widget.active ? _pine : const Color(0xFFD0DBD3),
-                fontWeight: widget.active ? FontWeight.w800 : FontWeight.w500,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DashboardSidebar extends StatelessWidget {
-  final AuthSession session;
   final FleetSummary? summary;
   final bool loading;
 
-  const _DashboardSidebar({
-    required this.session,
-    required this.summary,
-    required this.loading,
-  });
+  const _DashboardSidebar({required this.summary, required this.loading});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(23),
-        border: Border.all(color: const Color(0xFFE3E8E1)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'FLEET OVERVIEW',
-              style: TextStyle(
-                color: _muted,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.3,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'YOUR PROFILE',
-              style: TextStyle(
-                color: _muted,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.3,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: forest.withValues(alpha: .13),
-                  child: Text(
-                    _initials(session.fullName),
-                    style: const TextStyle(
-                      color: forest,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Text(
-                    session.fullName,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.alternate_email_rounded,
-                  color: _muted,
-                  size: 15,
-                ),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: SelectableText(
-                    session.email,
-                    style: const TextStyle(
-                      color: _muted,
-                      fontSize: 11.5,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Row(
-              children: [
-                Icon(Icons.verified_user_outlined, size: 15, color: forest),
-                SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    'Authenticated account',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : double.infinity,
+          ),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(23),
+            border: Border.all(color: const Color(0xFFE3E8E1)),
+          ),
+          child: Scrollbar(
+            thumbVisibility: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'FLEET OVERVIEW',
                     style: TextStyle(
-                      color: forest,
+                      color: _muted,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.3,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${summary?.total ?? '—'} registered vehicles',
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
+                  const SizedBox(height: 14),
+                  _StatTile(
+                    'Total vehicles',
+                    summary?.total,
+                    Icons.directions_car_filled_rounded,
+                    const Color(0xFF4964A6),
+                  ),
+                  _StatTile(
+                    'Active',
+                    summary?.active,
+                    Icons.local_shipping_outlined,
+                    forest,
+                  ),
+                  _StatTile(
+                    'Maintenance',
+                    summary?.maintenance,
+                    Icons.handyman_outlined,
+                    _amber,
+                  ),
+                  _StatTile(
+                    'Inactive',
+                    summary?.inactive,
+                    Icons.cancel_outlined,
+                    accent,
+                  ),
+                  if (loading) ...[
+                    const SizedBox(height: 6),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    summary == null
+                        ? 'Counts are across the entire fleet.'
+                        : 'Counts are across the entire fleet · ${summary!.inactive} inactive.',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: _muted,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 14),
-            _StatTile(
-              'Active',
-              summary?.active,
-              Icons.local_shipping_outlined,
-              forest,
-            ),
-            _StatTile(
-              'Assigned',
-              summary?.assigned,
-              Icons.route_outlined,
-              _blue,
-            ),
-            _StatTile(
-              'Available',
-              summary?.available,
-              Icons.check_circle_outline,
-              forest,
-            ),
-            _StatTile(
-              'Maintenance',
-              summary?.maintenance,
-              Icons.handyman_outlined,
-              _amber,
-            ),
-            if (loading) ...[
-              const SizedBox(height: 6),
-              const LinearProgressIndicator(minHeight: 2),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              summary == null
-                  ? 'Counts are across the entire fleet.'
-                  : 'Counts are across the entire fleet · ${summary!.inactive} inactive.',
-              style: const TextStyle(fontSize: 11, color: _muted, height: 1.4),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1004,7 +1030,7 @@ class _RegistryHead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(
+    final style = GoogleFonts.poppins(
       color: _pine,
       fontSize: 14,
       fontWeight: FontWeight.bold,
@@ -1026,19 +1052,19 @@ class _RegistryHead extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(
+        SizedBox(
           width: _colVehicle,
           child: Text('VEHICLE', style: style),
         ),
         const SizedBox(width: _colGap),
-        const SizedBox(
+        SizedBox(
           width: _colPlate,
           child: Text('NUMBER PLATE', style: style),
         ),
         const SizedBox(width: _colGap),
-        const Expanded(child: Text('DEPOT', style: style)),
+        Expanded(child: Text('DEPOT', style: style)),
         const SizedBox(width: _colGap),
-        const SizedBox(
+        SizedBox(
           width: _colStatus,
           child: Center(child: Text('STATUS', style: style)),
         ),
@@ -1054,7 +1080,6 @@ class _VehicleListRow extends StatefulWidget {
   final VoidCallback onTap;
 
   const _VehicleListRow({
-    super.key,
     required this.vehicle,
     required this.checked,
     required this.highlighted,
@@ -1204,7 +1229,7 @@ Color _statusDot(String status) {
   return switch (status) {
     'INACTIVE' => accent,
     'MAINTENANCE' => _amber,
-    _ => forest, // AVAILABLE and ASSIGNED both mean operational / active
+    _ => forest,
   };
 }
 
@@ -1446,9 +1471,18 @@ class _VehicleDetailsDrawer extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      const Text(
-                        'Fleet record',
-                        style: TextStyle(color: _muted, fontSize: 12),
+                      Expanded(
+                        child: Text(
+                          vehicle.assignedDepot,
+                          maxLines: 2,
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _muted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1456,16 +1490,16 @@ class _VehicleDetailsDrawer extends StatelessWidget {
                   _DetailSection(
                     title: 'Identification',
                     children: [
-                      _DetailField('Vehicle name', vehicle.vehicleName),
-                      _DetailField(
+                      _DetailTile('Vehicle name', vehicle.vehicleName),
+                      _DetailTile(
                         'Number plate',
                         vehicle.numberPlate,
                         emphasis: true,
                       ),
-                      _DetailField('Vehicle type', _nice(vehicle.vehicleType)),
-                      _DetailField('Manufacturer', vehicle.manufacturer),
-                      _DetailField('Model', vehicle.model),
-                      _DetailField(
+                      _DetailTile('Vehicle type', _nice(vehicle.vehicleType)),
+                      _DetailTile('Manufacturer', vehicle.manufacturer),
+                      _DetailTile('Model', vehicle.model),
+                      _DetailTile(
                         'Manufacture year',
                         '${vehicle.manufactureYear}',
                       ),
@@ -1475,36 +1509,22 @@ class _VehicleDetailsDrawer extends StatelessWidget {
                   _DetailSection(
                     title: 'Specifications',
                     children: [
-                      _DetailField('Color', vehicle.color),
-                      _DetailField(
+                      _DetailTile('Color', vehicle.color),
+                      _DetailTile(
                         'Seat capacity',
                         '${vehicle.seatCapacity} seats',
                       ),
-                      _DetailField('Engine capacity', '${vehicle.engineCc} CC'),
-                      _DetailField('Fuel type', _nice(vehicle.fuelType)),
+                      _DetailTile('Engine capacity', '${vehicle.engineCc} CC'),
+                      _DetailTile('Fuel type', _nice(vehicle.fuelType)),
                     ],
                   ),
                   const SizedBox(height: 15),
                   _DetailSection(
-                    title: 'Fleet assignment',
+                    title: 'Notes',
                     children: [
-                      _DetailField('Status', _nice(vehicle.status)),
-                      _DetailField('Station / depot', vehicle.assignedDepot),
-                      _DetailField(
-                        'Notes',
+                      _DetailTile(
+                        'Vehicle note',
                         vehicle.notes.isEmpty ? '—' : vehicle.notes,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  _DetailSection(
-                    title: 'Record metadata',
-                    children: [
-                      _DetailField('Record ID', vehicle.id),
-                      _DetailField('Created', _dateTime(vehicle.createdAt)),
-                      _DetailField(
-                        'Last updated',
-                        _dateTime(vehicle.updatedAt),
                       ),
                     ],
                   ),
@@ -1552,14 +1572,6 @@ class _VehicleDetailsDrawer extends StatelessWidget {
   }
 }
 
-String _dateTime(DateTime? value) {
-  if (value == null) return '—';
-  final local = value.toLocal();
-  String digits(int n) => n.toString().padLeft(2, '0');
-  return '${local.year}-${digits(local.month)}-${digits(local.day)} '
-      '${digits(local.hour)}:${digits(local.minute)}';
-}
-
 class _DetailSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -1587,24 +1599,44 @@ class _DetailSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 13),
-          ...children,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final tileWidth = constraints.maxWidth >= 310
+                  ? (constraints.maxWidth - 10) / 2
+                  : constraints.maxWidth;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: children
+                    .map((child) => SizedBox(width: tileWidth, child: child))
+                    .toList(),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 }
 
-class _DetailField extends StatelessWidget {
+class _DetailTile extends StatelessWidget {
   final String label, value;
   final bool emphasis;
-  const _DetailField(this.label, this.value, {this.emphasis = false});
+  const _DetailTile(this.label, this.value, {this.emphasis = false});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 11),
+    return Container(
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0xFFE7ECE6)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label.toUpperCase(),

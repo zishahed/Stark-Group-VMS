@@ -30,22 +30,22 @@ public class VehicleDevSeeder {
             var samples = new VehicleRequest[] {
                 new VehicleRequest("Executive Jeep 01", "Toyota", "Land Cruiser", "White", 7,
                     "DHAKA METRO - GHA - 12 - 3456", 2800, VehicleType.SUV,
-                    FuelType.DIESEL, VehicleStatus.AVAILABLE, "Dhaka Central Depot", 2023, "Demo vehicle"),
+                    FuelType.DIESEL, VehicleStatus.ACTIVE, "Dhaka Central Depot", 2023, "Demo vehicle"),
                 new VehicleRequest("Office Sedan 02", "Toyota", "Axio", "Silver", 5,
                     "DHAKA METRO - GA - 18 - 4921", 1500, VehicleType.SEDAN,
-                    FuelType.PETROL, VehicleStatus.ASSIGNED, "Mirpur Depot", 2021, "Demo vehicle"),
+                    FuelType.PETROL, VehicleStatus.ACTIVE, "Mirpur Depot", 2021, "Demo vehicle"),
                 new VehicleRequest("Staff Microbus", "Toyota", "Hiace", "White", 12,
                     "DHAKA METRO - CHA - 15 - 2450", 2700, VehicleType.MICROBUS,
                     FuelType.DIESEL, VehicleStatus.MAINTENANCE, "Dhaka Central Depot", 2020, "Demo vehicle"),
                 new VehicleRequest("Logistics Van", "Nissan", "NV200", "Grey", 2,
                     "DHAKA METRO - MA - 11 - 5923", 1600, VehicleType.VAN,
-                    FuelType.PETROL, VehicleStatus.AVAILABLE, "Uttara Depot", 2022, "Demo vehicle"),
+                    FuelType.PETROL, VehicleStatus.ACTIVE, "Uttara Depot", 2022, "Demo vehicle"),
                 new VehicleRequest("Field Operations SUV", "Mitsubishi", "Pajero", "Black", 7,
                     "DHAKA METRO - GHA - 22 - 8912", 2500, VehicleType.SUV,
-                    FuelType.DIESEL, VehicleStatus.ASSIGNED, "Mirpur Depot", 2024, "Demo vehicle"),
+                    FuelType.DIESEL, VehicleStatus.ACTIVE, "Mirpur Depot", 2024, "Demo vehicle"),
                 new VehicleRequest("Office Car 06", "Honda", "Civic", "Blue", 5,
                     "DHAKA METRO - GA - 24 - 1875", 1800, VehicleType.SEDAN,
-                    FuelType.HYBRID, VehicleStatus.AVAILABLE, "Uttara Depot", 2023, "Demo vehicle")
+                    FuelType.HYBRID, VehicleStatus.ACTIVE, "Uttara Depot", 2023, "Demo vehicle")
             };
             for (VehicleRequest sample : samples) {
                 String plate = PlateNormalizer.normalize(sample.numberPlate());

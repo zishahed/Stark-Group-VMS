@@ -388,9 +388,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final list = listing;
     final items = list?.items ?? <Vehicle>[];
-    final assigned = items.where((v) => v.status == 'ASSIGNED').length;
-    final available = items.where((v) => v.status == 'AVAILABLE').length;
+    final active = items.where((v) => v.status == 'ACTIVE').length;
     final maintenance = items.where((v) => v.status == 'MAINTENANCE').length;
+    final inactive = items.where((v) => v.status == 'INACTIVE').length;
     return Scaffold(
       body: Column(
         children: [
@@ -497,14 +497,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 icon: Icons.directions_car_rounded,
                               ),
                               StatCard(
-                                label: 'Available (page)',
-                                value: '$available',
+                                label: 'Active (page)',
+                                value: '$active',
                                 icon: Icons.check_circle_outline,
                               ),
                               StatCard(
-                                label: 'Assigned (page)',
-                                value: '$assigned',
-                                icon: Icons.route_outlined,
+                                label: 'Inactive (page)',
+                                value: '$inactive',
+                                icon: Icons.cancel_outlined,
                               ),
                               StatCard(
                                 label: 'Maintenance (page)',
@@ -779,9 +779,9 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      'AVAILABLE' => forest,
-      'ASSIGNED' => const Color(0xFF4964A6),
+      'ACTIVE' => forest,
       'MAINTENANCE' => const Color(0xFFC08419),
+      'INACTIVE' => const Color(0xFFD94060),
       _ => Colors.grey,
     };
     return Container(
@@ -834,7 +834,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     'ELECTRIC',
     'OTHER',
   ];
-  static const statuses = ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'INACTIVE'];
+  static const statuses = ['ACTIVE', 'MAINTENANCE', 'INACTIVE'];
 
   @override
   void initState() {
@@ -856,7 +856,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     };
     type = v?.vehicleType ?? 'SEDAN';
     fuel = v?.fuelType ?? 'PETROL';
-    status = v?.status ?? 'AVAILABLE';
+    status = v?.status ?? 'ACTIVE';
   }
 
   @override

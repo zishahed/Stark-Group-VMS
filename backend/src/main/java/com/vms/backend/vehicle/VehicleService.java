@@ -32,12 +32,10 @@ public class VehicleService {
     public FleetSummaryResponse summary(Jwt jwt) {
         UUID ownerId = owner(jwt);
         long total = vehicles.countByOwnerIdAndDeletedFalse(ownerId);
-        long available = vehicles.countByOwnerIdAndDeletedFalseAndStatus(ownerId, VehicleStatus.AVAILABLE);
-        long assigned = vehicles.countByOwnerIdAndDeletedFalseAndStatus(ownerId, VehicleStatus.ASSIGNED);
+        long active = vehicles.countByOwnerIdAndDeletedFalseAndStatus(ownerId, VehicleStatus.ACTIVE);
         long maintenance = vehicles.countByOwnerIdAndDeletedFalseAndStatus(ownerId, VehicleStatus.MAINTENANCE);
         long inactive = vehicles.countByOwnerIdAndDeletedFalseAndStatus(ownerId, VehicleStatus.INACTIVE);
-        long active = total - inactive;
-        return new FleetSummaryResponse(total, active, available, assigned, maintenance, inactive);
+        return new FleetSummaryResponse(total, active, active, 0, maintenance, inactive);
     }
 
     @Transactional(readOnly = true)
