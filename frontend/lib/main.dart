@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'api.dart';
 import 'screens.dart';
+import 'dashboard_screen.dart';
 
 const ivory = Color(0xFFFCF8F5);
 const forest = Color(0xFF2B8554);
@@ -49,8 +50,10 @@ class _VmsAppState extends State<VmsApp> {
           secondary: accent,
           surface: ivory,
         ),
-        textTheme: Theme.of(context).textTheme
-            .apply(bodyColor: ink, displayColor: ink),
+        textTheme: ThemeData.light().textTheme.apply(
+          bodyColor: ink,
+          displayColor: ink,
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -64,13 +67,37 @@ class _VmsAppState extends State<VmsApp> {
             vertical: 15,
           ),
         ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: ButtonStyle(
+            animationDuration: const Duration(milliseconds: 200),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            ),
+            elevation: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.hovered) ? 9 : 2,
+            ),
+            shadowColor: WidgetStatePropertyAll(forest.withValues(alpha: 0.27)),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: ButtonStyle(
+            animationDuration: const Duration(milliseconds: 200),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            ),
+            elevation: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.hovered) ? 5 : 0,
+            ),
+            shadowColor: WidgetStatePropertyAll(forest.withValues(alpha: 0.20)),
+          ),
+        ),
       ),
       home: session == null
           ? AuthScreen(
               api: api,
               onAuthenticated: (s) => setState(() => session = s),
             )
-          : DashboardScreen(api: api, session: session!, onLogout: logout),
+          : FleetDashboardScreen(api: api, session: session!, onLogout: logout),
     );
   }
 }

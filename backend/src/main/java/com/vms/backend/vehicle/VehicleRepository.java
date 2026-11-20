@@ -13,6 +13,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     boolean existsByNumberPlateAndDeletedFalseAndIdNot(String plate, UUID id);
     Optional<Vehicle> findByIdAndOwnerIdAndDeletedFalse(UUID id, UUID ownerId);
     long countByOwnerIdAndDeletedFalse(UUID ownerId);
+    long countByOwnerIdAndDeletedFalseAndStatus(UUID ownerId, VehicleStatus status);
 
     @Query("""
         SELECT v FROM Vehicle v

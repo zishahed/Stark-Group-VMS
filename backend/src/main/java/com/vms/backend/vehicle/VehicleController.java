@@ -30,6 +30,11 @@ public class VehicleController {
         return service.list(jwt, page, size, search);
     }
 
+    @GetMapping("/summary")
+    public FleetSummaryResponse summary(@AuthenticationPrincipal Jwt jwt) {
+        return service.summary(jwt);
+    }
+
     @GetMapping("/{id}")
     public VehicleResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.get(jwt, id);

@@ -218,7 +218,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(30),
                           ),
                           child: const Text(
-                            'STARK GROUP  /  FLEET OPERATIONS',
+                            'STARK GROUP',
                             style: TextStyle(
                               color: forest,
                               fontWeight: FontWeight.bold,
