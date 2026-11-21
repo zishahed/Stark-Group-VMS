@@ -40,6 +40,7 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder(12);
     }
 
+    @SuppressWarnings("null")
     @Bean
     CorsConfigurationSource corsConfigurationSource(@Value("${vms.cors.allowed-origins}") String origins) {
         var cfg = new CorsConfiguration();

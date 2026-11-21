@@ -1,9 +1,15 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'api.dart';
 import 'main.dart';
+
+const _pine = Color(0xFF1C3027);
+const _muted = Color(0xFF6E7B72);
 
 void showError(BuildContext context, Object error) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -26,17 +32,114 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen>
+    with SingleTickerProviderStateMixin {
   final form = GlobalKey<FormState>();
   final name = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
+  final ValueNotifier<int> _frameIndex = ValueNotifier<int>(0);
   bool registering = false;
   bool busy = false;
   bool reveal = false;
 
+  // Timeline checkpoints (0.0 = start of GIF, 1.0 = end of GIF).
+  static const double _arriveEnd = 0.56; // Bus reaches middle and stops
+  static const double _vibrateStart = 0.56; // Vibration starts
+  static const double _vibrateEnd = 0.72; // Vibration ends
+  static const double _exitStart = 0.72; // Bus drives off to the left
+
+  late final AnimationController _gifController;
+  List<ui.Image> _frames = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _gifController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..addListener(_syncFrame);
+    _loadGif();
+  }
+
+  void _syncFrame() {
+    if (_frames.isEmpty) return;
+    final next = (_gifController.value * (_frames.length - 1)).round().clamp(
+      0,
+      _frames.length - 1,
+    );
+    if (_frameIndex.value != next) {
+      _frameIndex.value = next;
+    }
+  }
+
+  Future<void> _loadGif() async {
+    try {
+      final data = await rootBundle.load('lib/assets/microbus.gif');
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(),
+        targetWidth: 480,
+      );
+
+      final loaded = <ui.Image>[];
+      var totalMs = 0;
+      final step = codec.frameCount > 60 ? (codec.frameCount / 60).ceil() : 1;
+
+      for (var i = 0; i < codec.frameCount; i++) {
+        final frame = await codec.getNextFrame();
+        totalMs += frame.duration.inMilliseconds;
+        if (i % step == 0 || i == codec.frameCount - 1) {
+          loaded.add(frame.image);
+        } else {
+          frame.image.dispose();
+        }
+      }
+      codec.dispose();
+
+      if (!mounted) {
+        for (final img in loaded) {
+          img.dispose();
+        }
+        return;
+      }
+
+      setState(() {
+        _frames = loaded;
+        if (totalMs > 0) {
+          _gifController.duration = Duration(milliseconds: totalMs);
+        }
+      });
+
+      _gifController.value = 0.0;
+      _gifController.animateTo(_arriveEnd);
+    } catch (e) {
+      debugPrint('Failed to load microbus GIF: $e');
+    }
+  }
+
+  Future<void> _playVibrate() async {
+    if (_frames.isEmpty) return;
+    _gifController.value = _vibrateStart;
+    await _gifController.animateTo(_vibrateEnd);
+    if (mounted) {
+      _gifController.value = _arriveEnd;
+    }
+  }
+
+  Future<void> _playExit() async {
+    if (_frames.isEmpty) return;
+    _gifController.value = _exitStart;
+    await _gifController.animateTo(1.0);
+  }
+
   @override
   void dispose() {
+    _gifController.removeListener(_syncFrame);
+    _gifController.dispose();
+    _frameIndex.dispose();
+    for (final img in _frames) {
+      img.dispose();
+    }
     name.dispose();
     email.dispose();
     password.dispose();
@@ -54,236 +157,468 @@ class _AuthScreenState extends State<AuthScreen> {
               password.text,
             )
           : await widget.api.signIn(email.text.trim(), password.text);
+
+      if (!registering) {
+        await _playExit();
+      }
       if (mounted) widget.onAuthenticated(session);
     } catch (error) {
+      if (!registering) {
+        _playVibrate();
+      }
       if (mounted) showError(context, error);
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
+  Widget _buildControlledGif({double? height}) {
+    if (_frames.isEmpty) {
+      return SizedBox(height: height ?? 240);
+    }
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.hardEdge,
+        child: ValueListenableBuilder<int>(
+          valueListenable: _frameIndex,
+          builder: (context, index, _) {
+            return RawImage(
+              image: _frames[index],
+              height: height,
+              width: double.infinity,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.low,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegistrationPerks() {
+    const perks = [
+      (
+        Icons.directions_bus_outlined,
+        'Centralized fleet registry',
+        'Track every sedan, microbus, and utility vehicle in one place.',
+      ),
+      (
+        Icons.verified_outlined,
+        'Verified registration plates',
+        'Built-in Dhaka Metro plate validation keeps records clean and compliant.',
+      ),
+      (
+        Icons.location_city_outlined,
+        'Organized depot assignments',
+        'Monitor station allocations and vehicle availability at a glance.',
+      ),
+      (
+        Icons.shield_outlined,
+        'Secure account & audit history',
+        'Protected sign-in with safe archiving so fleet records are never lost.',
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Stark Group Limited',
+          style: GoogleFonts.greatVibes(
+            color: _pine,
+            fontWeight: FontWeight.bold,
+            fontSize: 28,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'Why manage your fleet with our VMS?',
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            color: _pine,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Create an account to unlock streamlined fleet operations across all depots.',
+          style: TextStyle(fontSize: 15, color: _muted, height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        for (final (icon, title, subtitle) in perks) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: forest.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: forest, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: _pine,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: _muted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFormContent() {
+    return Form(
+      key: form,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Icon(
+            Icons.directions_car_filled_rounded,
+            color: forest,
+            size: 42,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            registering ? 'Create an account' : 'Welcome back',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 7),
+          const Text(
+            'Manage your fleet securely and efficiently.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _muted),
+          ),
+          const SizedBox(height: 27),
+          if (registering) ...[
+            TextFormField(
+              controller: name,
+              maxLength: 80,
+              decoration: const InputDecoration(
+                labelText: 'Full name',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              validator: (v) =>
+                  (v ?? '').trim().isEmpty ? 'Enter your name' : null,
+            ),
+            const SizedBox(height: 12),
+          ],
+          TextFormField(
+            controller: email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email address',
+              prefixIcon: Icon(Icons.mail_outline),
+            ),
+            validator: (v) =>
+                RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch((v ?? '').trim())
+                ? null
+                : 'Enter a valid email',
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: password,
+            obscureText: !reveal,
+            onFieldSubmitted: (_) => submit(),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(reveal ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => reveal = !reveal),
+              ),
+            ),
+            validator: (v) => (v ?? '').length < (registering ? 8 : 1)
+                ? (registering
+                      ? 'Use at least 8 characters'
+                      : 'Enter your password')
+                : null,
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: busy ? null : submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(52),
+            ),
+            child: busy
+                ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(registering ? 'Create account' : 'Sign in'),
+          ),
+          const SizedBox(height: 14),
+          TextButton(
+            onPressed: busy
+                ? null
+                : () {
+                    setState(() => registering = !registering);
+                    if (!registering && _frames.isNotEmpty) {
+                      _gifController.value = 0.0;
+                      _gifController.animateTo(_arriveEnd);
+                    }
+                  },
+            child: Text(
+              registering
+                  ? 'Already registered? Sign in'
+                  : 'New to VMS? Create an account',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final wide = constraints.maxWidth > 720;
-                final formCard = Container(
-                  width: wide ? 440 : double.infinity,
-                  padding: const EdgeInsets.all(30),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: .06),
-                        blurRadius: 30,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Form(
-                    key: form,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Icon(
-                          Icons.directions_car_filled_rounded,
-                          color: forest,
-                          size: 42,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          registering ? 'Create an account' : 'Welcome back',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 27,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        const Text(
-                          'Manage your fleet securely and efficiently.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF6E7B72)),
-                        ),
-                        const SizedBox(height: 27),
-                        if (registering) ...[
-                          TextFormField(
-                            controller: name,
-                            maxLength: 80,
-                            decoration: const InputDecoration(
-                              labelText: 'Full name',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                            validator: (v) => (v ?? '').trim().isEmpty
-                                ? 'Enter your name'
-                                : null,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        TextFormField(
-                          controller: email,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email address',
-                            prefixIcon: Icon(Icons.mail_outline),
-                          ),
-                          validator: (v) =>
-                              RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                                  .hasMatch((v ?? '').trim())
-                              ? null
-                              : 'Enter a valid email',
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: password,
-                          obscureText: !reveal,
-                          onFieldSubmitted: (_) => submit(),
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                reveal
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                              ),
-                              onPressed: () => setState(() => reveal = !reveal),
-                            ),
-                          ),
-                          validator: (v) =>
-                              (v ?? '').length < (registering ? 8 : 1)
-                              ? (registering
-                                    ? 'Use at least 8 characters'
-                                    : 'Enter your password')
-                              : null,
-                        ),
-                        const SizedBox(height: 24),
-                        FilledButton(
-                          onPressed: busy ? null : submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: accent,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(52),
-                          ),
-                          child: busy
-                              ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+      body: LayoutBuilder(
+        builder: (context, viewport) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: viewport.maxHeight,
+                minWidth: viewport.maxWidth,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final wide = constraints.maxWidth > 720;
+
+                          // LOGIN VIEW: Animation + Login Card inside one white container
+                          if (!registering) {
+                            return Container(
+                              padding: const EdgeInsets.all(30),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: .06),
+                                    blurRadius: 30,
+                                    offset: const Offset(0, 12),
                                   ),
-                                )
-                              : Text(
-                                  registering ? 'Create account' : 'Sign in',
+                                ],
+                              ),
+                              child: wide
+                                  ? Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 28,
+                                            ),
+                                            child: Center(
+                                              child: _buildControlledGif(),
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          width: 1,
+                                          height: 360,
+                                          color: const Color(0xFFE8EAE6),
+                                        ),
+                                        const SizedBox(width: 28),
+                                        SizedBox(
+                                          width: 400,
+                                          child: _buildFormContent(),
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      children: [
+                                        _buildControlledGif(height: 180),
+                                        const SizedBox(height: 24),
+                                        _buildFormContent(),
+                                      ],
+                                    ),
+                            );
+                          }
+
+                          // REGISTRATION VIEW: Stark Group Limited + VMS Perks + Form Card
+                          final formCard = Container(
+                            width: wide ? 440 : double.infinity,
+                            padding: const EdgeInsets.all(30),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: .06),
+                                  blurRadius: 30,
+                                  offset: const Offset(0, 12),
                                 ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextButton(
-                          onPressed: busy
-                              ? null
-                              : () =>
-                                    setState(() => registering = !registering),
-                          child: Text(
-                            registering
-                                ? 'Already registered? Sign in'
-                                : 'New to VMS? Create an account',
-                          ),
-                        ),
-                      ],
+                              ],
+                            ),
+                            child: _buildFormContent(),
+                          );
+
+                          return wide
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 36,
+                                        ),
+                                        child: _buildRegistrationPerks(),
+                                      ),
+                                    ),
+                                    formCard,
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildRegistrationPerks(),
+                                    const SizedBox(height: 20),
+                                    formCard,
+                                  ],
+                                );
+                        },
+                      ),
                     ),
                   ),
-                );
-                final introduction = Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 30),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: forest.withValues(alpha: .12),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: const Text(
-                            'STARK GROUP  /  FLEET OPERATIONS',
-                            style: TextStyle(
-                              color: forest,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        const Text(
-                          'Every vehicle.\nOne clear view.',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 49,
-                            height: 1.15,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        const Text(
-                          'A streamlined vehicle registry with secure access, '
-                          'live fleet records, and organized depot assignments.',
-                          style: TextStyle(
-                            fontSize: 17,
-                            color: Color(0xFF607166),
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        const Row(
-                          children: [
-                            Icon(Icons.verified_user_outlined, color: forest),
-                            SizedBox(width: 12),
-                            Text('Secure account access'),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        const Row(
-                          children: [
-                            Icon(Icons.check_circle_outline, color: forest),
-                            SizedBox(width: 12),
-                            Text('Verified registration plates'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-                return wide
-                    ? Row(children: [introduction, formCard])
-                    : Column(
-                        children: [
-                          const Text(
-                            'STARK GROUP VMS',
-                            style: TextStyle(
-                              fontSize: 22,
-                              color: forest,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 25),
-                          formCard,
-                        ],
-                      );
-              },
+                  const _DashboardFooter(),
+                ],
+              ),
             ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DashboardFooter extends StatelessWidget {
+  const _DashboardFooter();
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(height: 10),
+        SizedBox(
+          width: 260,
+          child: Divider(height: 1, thickness: 2, color: Color(0xFFD8DFD6)),
+        ),
+        SizedBox(height: 5),
+        Text(
+          'Vehicle management system v1.0.0',
+          style: TextStyle(
+            color: _pine,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'by ',
+              style: TextStyle(
+                color: _muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                height: 1.2,
+              ),
+            ),
+            _AuthorLink(
+              label: 'Zunayed Iqbal Shahed',
+              url: 'https://github.com/zishahed',
+            ),
+          ],
+        ),
+        SizedBox(height: 15),
+      ],
+    );
+  }
+}
+
+class _AuthorLink extends StatefulWidget {
+  final String label;
+  final String url;
+  const _AuthorLink({required this.label, required this.url});
+
+  @override
+  State<_AuthorLink> createState() => _AuthorLinkState();
+}
+
+class _AuthorLinkState extends State<_AuthorLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: () {
+          Clipboard.setData(ClipboardData(text: widget.url));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Copied link: ${widget.url}')));
+        },
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            color: _pine,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+            decoration: _hovered
+                ? TextDecoration.underline
+                : TextDecoration.none,
           ),
         ),
       ),

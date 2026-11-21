@@ -17,8 +17,6 @@ const _amber = Color(0xFFE4A62A);
 const _pageSize = 9;
 const _colCheck = 42.0;
 const _colGap = 8.0;
-const _colVehicle = 175.0;
-const _colPlate = 325.0;
 const _colStatus = 60.0;
 
 const _flexVehicle = 22;
@@ -1715,18 +1713,6 @@ class _ProfileSignOutBarState extends State<_ProfileSignOutBar> {
       ],
     );
   }
-}
-
-String _initials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((s) => s.isNotEmpty)
-      .toList();
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-  return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-      .toUpperCase();
 }
 
 class _LocalNotification {
