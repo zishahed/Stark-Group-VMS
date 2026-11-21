@@ -302,12 +302,6 @@ class _AuthScreenState extends State<AuthScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(
-            Icons.directions_car_filled_rounded,
-            color: forest,
-            size: 42,
-          ),
-          const SizedBox(height: 10),
           Text(
             registering ? 'Create an account' : 'Welcome back',
             textAlign: TextAlign.center,
@@ -315,7 +309,7 @@ class _AuthScreenState extends State<AuthScreen>
           ),
           const SizedBox(height: 7),
           const Text(
-            'Manage your fleet securely and efficiently.',
+            'Manage your fleet securely with our VMS.',
             textAlign: TextAlign.center,
             style: TextStyle(color: _muted),
           ),
