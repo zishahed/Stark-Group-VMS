@@ -390,7 +390,7 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Align(
-                      alignment: Alignment.centerRight,
+                      alignment: Alignment.centerLeft,
                       child: _DashboardFooter(),
                     ),
                     const SizedBox(height: 6),
