@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'plate_rules.dart';
+
 import 'api.dart';
 import 'main.dart';
 
@@ -1155,16 +1157,30 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
   final form = GlobalKey<FormState>();
   late final Map<String, TextEditingController> fields;
   late String type, fuel, status;
+  String _registrationUsage = 'PRIVATE';
   bool saving = false;
+  String? numberPlateError;
 
   static const types = [
     'SEDAN',
+    'HATCHBACK',
     'SUV',
+    'JEEP',
     'MICROBUS',
+    'MINIBUS',
     'BUS',
     'TRUCK',
-    'MOTORBIKE',
+    'PICKUP',
+    'DOUBLE_CAB_PICKUP',
     'VAN',
+    'DELIVERY_VAN',
+    'MOTORBIKE',
+    'SCOOTER',
+    'AUTO_RICKSHAW',
+    'TAXI',
+    'AMBULANCE',
+    'TRACTOR',
+    'SPECIAL_PURPOSE',
     'OTHER',
   ];
   static const fuels = [
@@ -1187,7 +1203,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
       'model': TextEditingController(text: v?.model ?? ''),
       'color': TextEditingController(text: v?.color ?? ''),
       'seatCapacity': TextEditingController(text: '${v?.seatCapacity ?? 5}'),
-      'numberPlate': TextEditingController(text: v?.numberPlate ?? ''),
+      'numberPlate': TextEditingController(
+        text: PlateRules.digitsFromExistingPlate(v?.numberPlate),
+      ),
       'engineCc': TextEditingController(text: '${v?.engineCc ?? 1500}'),
       'assignedDepot': TextEditingController(text: v?.assignedDepot ?? ''),
       'manufactureYear': TextEditingController(
@@ -1198,6 +1216,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     type = v?.vehicleType.trim().toUpperCase() ?? 'SEDAN';
     fuel = v?.fuelType.trim().toUpperCase() ?? 'PETROL';
     status = v?.status.trim().toUpperCase() ?? 'ACTIVE';
+    // Existing API model does not expose registration usage yet.
+    // Default to PRIVATE until it is returned by the backend.
+    _registrationUsage = 'PRIVATE';
   }
 
   @override
@@ -1216,28 +1237,29 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     bool optional = false,
     int? min,
     int? max,
+    String? errorText,
   }) {
+    final controller = fields[key]!;
     return TextFormField(
-      controller: fields[key],
-      maxLength: maxLength,
+      controller: controller,
       keyboardType: numeric ? TextInputType.number : TextInputType.text,
-      decoration: InputDecoration(labelText: label, counterText: ''),
+      inputFormatters: [
+        LengthLimitingTextInputFormatter(maxLength),
+        if (numeric) FilteringTextInputFormatter.digitsOnly,
+      ],
+      decoration: InputDecoration(labelText: label, errorText: errorText),
       validator: (value) {
-        final s = (value ?? '').trim();
-        if (s.isEmpty && !optional) return '$label is required';
-        if (s.length > maxLength) return 'Maximum $maxLength characters';
-        if (numeric) {
-          final n = int.tryParse(s);
-          if (n == null) return 'Enter a whole number';
-          if (min != null && n < min) return 'Minimum is $min';
-          if (max != null && n > max) return 'Maximum is $max';
+        final text = value?.trim() ?? '';
+        if (text.isEmpty) {
+          return optional ? null : 'This field is required.';
         }
-        if (key == 'numberPlate' &&
-            !RegExp(
-              r'^DHAKA METRO\s*-\s*[A-Z]{1,5}\s*-\s*\d{2}\s*-\s*\d{4}$',
-              caseSensitive: false,
-            ).hasMatch(s)) {
-          return 'Example: DHAKA METRO - GHA - 12 - 3456';
+        if (numeric) {
+          final parsed = int.tryParse(text);
+          if (parsed == null ||
+              (min != null && parsed < min) ||
+              (max != null && parsed > max)) {
+            return 'Enter a valid value.';
+          }
         }
         return null;
       },
@@ -1265,16 +1287,37 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
 
   Future<void> save() async {
     if (!(form.currentState?.validate() ?? false)) return;
-    setState(() => saving = true);
+
+    final generatedPlate = PlateRules.preview(
+      vehicleType: type,
+      engineCc: int.tryParse(fields['engineCc']!.text),
+      usage: _registrationUsage,
+      registrationDigits: fields['numberPlate']!.text,
+    );
+
+    if (generatedPlate == null) {
+      showError(
+        context,
+        'Cannot determine a plate class for these details. '
+        'Check the vehicle type, CC and BRTA registration certificate.',
+      );
+      return;
+    }
+
     final body = <String, dynamic>{
       for (final key in fields.keys) key: fields[key]!.text.trim(),
       'vehicleType': type,
       'fuelType': fuel,
       'status': status,
+      // Send the six issued digits; Spring Boot generates the full plate.
+      'numberPlate': fields['numberPlate']!.text.trim(),
+      'registrationUsage': _registrationUsage,
     };
     for (final key in ['seatCapacity', 'engineCc', 'manufactureYear']) {
       body[key] = int.parse(body[key] as String);
     }
+
+    setState(() => saving = true);
     try {
       if (widget.vehicle == null) {
         await widget.api.createVehicle(body);
@@ -1283,12 +1326,21 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
       }
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) {
-        if (widget.onError != null) {
-          widget.onError!(error);
-        } else {
-          showError(context, error);
-        }
+      if (!mounted) return;
+      final message = error.toString();
+      if (message.toLowerCase().contains(
+        'vehicle number plate already exists',
+      )) {
+        setState(() {
+          numberPlateError =
+              'This number plate is already registered in Database.';
+        });
+      }
+      // Preserve the dashboard error notification.
+      if (widget.onError != null) {
+        widget.onError!(error);
+      } else {
+        showError(context, error);
       }
     } finally {
       if (mounted) setState(() => saving = false);
@@ -1298,6 +1350,14 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
+
+    final generatedPlate = PlateRules.preview(
+      vehicleType: type,
+      engineCc: int.tryParse(fields['engineCc']?.text ?? ''),
+      usage: _registrationUsage,
+      registrationDigits: fields['numberPlate']?.text ?? '',
+    );
+
     return Dialog(
       backgroundColor: ivory,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1330,6 +1390,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 ],
               ),
             ),
+
             Expanded(
               child: Form(
                 key: form,
@@ -1340,6 +1401,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                       final width = constraints.maxWidth > 560
                           ? (constraints.maxWidth - 16) / 2
                           : constraints.maxWidth;
+
                       return Wrap(
                         spacing: 16,
                         runSpacing: 16,
@@ -1348,18 +1410,22 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                             width: width,
                             child: textField('vehicleName', 'Vehicle name'),
                           ),
+
                           SizedBox(
                             width: width,
                             child: textField('manufacturer', 'Manufacturer'),
                           ),
+
                           SizedBox(
                             width: width,
                             child: textField('model', 'Model'),
                           ),
+
                           SizedBox(
                             width: width,
                             child: textField('color', 'Color', maxLength: 30),
                           ),
+
                           SizedBox(
                             width: width,
                             child: textField(
@@ -1371,17 +1437,33 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               maxLength: 2,
                             ),
                           ),
+
                           SizedBox(
                             width: width,
-                            child: textField(
-                              'engineCc',
-                              'Engine CC',
-                              numeric: true,
-                              min: 0,
-                              max: 20000,
-                              maxLength: 5,
+                            child: TextFormField(
+                              controller: fields['engineCc'],
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Engine Capacity (CC)',
+                                hintText: 'e.g. 1500',
+                              ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(5),
+                              ],
+                              onChanged: (_) => setState(() {}),
+                              validator: (value) {
+                                final cc = int.tryParse(value ?? '');
+
+                                if (cc == null || cc <= 0 || cc > 20000) {
+                                  return 'Enter valid engine CC';
+                                }
+
+                                return null;
+                              },
                             ),
                           ),
+
                           SizedBox(
                             width: width,
                             child: drop(
@@ -1391,6 +1473,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               (v) => type = v,
                             ),
                           ),
+
                           SizedBox(
                             width: width,
                             child: drop(
@@ -1400,6 +1483,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               (v) => fuel = v,
                             ),
                           ),
+
                           SizedBox(
                             width: width,
                             child: drop(
@@ -1409,6 +1493,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               (v) => status = v,
                             ),
                           ),
+
                           SizedBox(
                             width: width,
                             child: textField(
@@ -1420,14 +1505,106 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               maxLength: 4,
                             ),
                           ),
+
                           SizedBox(
-                            width: constraints.maxWidth,
-                            child: textField(
-                              'numberPlate',
-                              'Number plate (DHAKA METRO - GHA - 12 - 3456)',
-                              maxLength: 50,
+                            width: width,
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _registrationUsage,
+                              decoration: const InputDecoration(
+                                labelText: 'Registration usage',
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'PRIVATE',
+                                  child: Text('Private'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'COMMERCIAL',
+                                  child: Text('Commercial / Hire'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _registrationUsage = value;
+                                  });
+                                }
+                              },
                             ),
                           ),
+
+                          SizedBox(
+                            width: width,
+                            child: TextFormField(
+                              controller: fields['numberPlate'],
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                errorText: numberPlateError,
+                                labelText: 'Registration number',
+                                hintText: '123456',
+                                helperText: 'Enter the 6-digit BRTA number',
+                              ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(6),
+                              ],
+                              onChanged: (_) => setState(() {}),
+                              validator: (value) {
+                                if (value == null ||
+                                    !RegExp(r'^\d{6}$').hasMatch(value)) {
+                                  return 'Enter exactly 6 digits';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+
+                          SizedBox(
+                            width: constraints.maxWidth,
+                            child: Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F6F1),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFD8E5DB),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'AUTOMATIC NUMBER PLATE',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    generatedPlate ??
+                                        'Complete the vehicle details',
+                                    style: const TextStyle(
+                                      fontSize: 21,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Plate class is suggested from '
+                                    'vehicle type, CC and usage. '
+                                    'Verify against the BRTA certificate.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
                           SizedBox(
                             width: constraints.maxWidth,
                             child: textField(
@@ -1436,6 +1613,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               maxLength: 100,
                             ),
                           ),
+
                           SizedBox(
                             width: constraints.maxWidth,
                             child: textField(
@@ -1452,6 +1630,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 ),
               ),
             ),
+
             Padding(
               padding: const EdgeInsets.all(18),
               child: Row(
@@ -1463,7 +1642,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                         : () => Navigator.pop(context, false),
                     child: const Text('Cancel'),
                   ),
+
                   const SizedBox(width: 12),
+
                   FilledButton.icon(
                     onPressed: saving ? null : save,
                     style: FilledButton.styleFrom(

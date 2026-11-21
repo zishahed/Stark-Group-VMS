@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+
 @Service
 public class VehicleService {
     private final VehicleRepository vehicles;
@@ -46,25 +47,43 @@ public class VehicleService {
     @Transactional
     public VehicleResponse add(Jwt jwt, VehicleRequest data) {
         checkYear(data.manufactureYear());
-        String plate = PlateNormalizer.normalize(data.numberPlate());
+        // Automatically classify and format the number plate.
+        String plate = generatePlate(data);
+        // Prevent duplicate active number plates.
         if (vehicles.existsByNumberPlateAndDeletedFalse(plate)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle number plate already exists");
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Vehicle number plate already exists"
+            );
         }
         var vehicle = new Vehicle(owner(jwt));
         vehicle.apply(data, plate);
-        return VehicleResponse.from(vehicles.saveAndFlush(vehicle));
+        return VehicleResponse.from(
+            vehicles.saveAndFlush(vehicle)
+        );
     }
 
     @Transactional
-    public VehicleResponse update(Jwt jwt, UUID id, VehicleRequest data) {
+    public VehicleResponse update(
+            Jwt jwt,
+            UUID id,
+            VehicleRequest data) {
         var vehicle = owned(jwt, id);
         checkYear(data.manufactureYear());
-        String plate = PlateNormalizer.normalize(data.numberPlate());
-        if (vehicles.existsByNumberPlateAndDeletedFalseAndIdNot(plate, id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle number plate already exists");
+        // Automatically classify and format the number plate.
+        String plate = generatePlate(data);
+        // Exclude the current vehicle when checking duplicates.
+        if (vehicles.existsByNumberPlateAndDeletedFalseAndIdNot(
+                plate, id)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Vehicle number plate already exists"
+            );
         }
         vehicle.apply(data, plate);
-        return VehicleResponse.from(vehicles.saveAndFlush(vehicle));
+        return VehicleResponse.from(
+            vehicles.saveAndFlush(vehicle)
+        );
     }
 
     @Transactional
@@ -73,12 +92,10 @@ public class VehicleService {
         vehicle.softDelete();
         vehicles.saveAndFlush(vehicle);
     }
-
     private Vehicle owned(Jwt jwt, UUID id) {
         return vehicles.findByIdAndOwnerIdAndDeletedFalse(id, owner(jwt))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
     }
-
     private static void checkYear(int year) {
         if (year > Year.now().getValue()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -86,5 +103,23 @@ public class VehicleService {
         }
     }
 
+    private static String generatePlate(VehicleRequest data) {
+    try {
+        String plateClass = VehiclePlateClassifier.classify(
+            data.vehicleType().name(),
+            data.engineCc(),
+            data.registrationUsage()
+        );
+        return NumberPlateFormatter.format(
+            plateClass,
+            data.numberPlate()
+        );
+    } catch (IllegalArgumentException ex) {
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            ex.getMessage()
+            );
+        }
+    }   
     private UUID owner(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 }
