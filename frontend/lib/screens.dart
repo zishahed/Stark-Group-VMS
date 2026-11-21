@@ -218,7 +218,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(30),
                           ),
                           child: const Text(
-                            'STARK GROUP',
+                            'STARK GROUP  /  FLEET OPERATIONS',
                             style: TextStyle(
                               color: forest,
                               fontWeight: FontWeight.bold,
@@ -388,9 +388,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final list = listing;
     final items = list?.items ?? <Vehicle>[];
-    final active = items.where((v) => v.status == 'ACTIVE').length;
+    final assigned = items.where((v) => v.status == 'ASSIGNED').length;
+    final available = items.where((v) => v.status == 'AVAILABLE').length;
     final maintenance = items.where((v) => v.status == 'MAINTENANCE').length;
-    final inactive = items.where((v) => v.status == 'INACTIVE').length;
     return Scaffold(
       body: Column(
         children: [
@@ -497,14 +497,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 icon: Icons.directions_car_rounded,
                               ),
                               StatCard(
-                                label: 'Active (page)',
-                                value: '$active',
+                                label: 'Available (page)',
+                                value: '$available',
                                 icon: Icons.check_circle_outline,
                               ),
                               StatCard(
-                                label: 'Inactive (page)',
-                                value: '$inactive',
-                                icon: Icons.cancel_outlined,
+                                label: 'Assigned (page)',
+                                value: '$assigned',
+                                icon: Icons.route_outlined,
                               ),
                               StatCard(
                                 label: 'Maintenance (page)',
@@ -779,9 +779,9 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      'ACTIVE' => forest,
+      'AVAILABLE' => forest,
+      'ASSIGNED' => const Color(0xFF4964A6),
       'MAINTENANCE' => const Color(0xFFC08419),
-      'INACTIVE' => const Color(0xFFD94060),
       _ => Colors.grey,
     };
     return Container(
@@ -805,7 +805,13 @@ class StatusPill extends StatelessWidget {
 class VehicleFormDialog extends StatefulWidget {
   final ApiClient api;
   final Vehicle? vehicle;
-  const VehicleFormDialog({super.key, required this.api, this.vehicle});
+  final ValueChanged<Object>? onError;
+  const VehicleFormDialog({
+    super.key,
+    required this.api,
+    this.vehicle,
+    this.onError,
+  });
   @override
   State<VehicleFormDialog> createState() => _VehicleFormDialogState();
 }
@@ -854,9 +860,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
       ),
       'notes': TextEditingController(text: v?.notes ?? ''),
     };
-    type = v?.vehicleType ?? 'SEDAN';
-    fuel = v?.fuelType ?? 'PETROL';
-    status = v?.status ?? 'ACTIVE';
+    type = v?.vehicleType.trim().toUpperCase() ?? 'SEDAN';
+    fuel = v?.fuelType.trim().toUpperCase() ?? 'PETROL';
+    status = v?.status.trim().toUpperCase() ?? 'ACTIVE';
   }
 
   @override
@@ -908,16 +914,19 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     String value,
     List<String> options,
     ValueChanged<String> change,
-  ) => DropdownButtonFormField<String>(
-    initialValue: value,
-    decoration: InputDecoration(labelText: label),
-    items: options
-        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-        .toList(),
-    onChanged: (s) {
-      if (s != null) setState(() => change(s));
-    },
-  );
+  ) {
+    final safeOptions = options.contains(value) ? options : [value, ...options];
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      items: safeOptions
+          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+          .toList(),
+      onChanged: (s) {
+        if (s != null) setState(() => change(s));
+      },
+    );
+  }
 
   Future<void> save() async {
     if (!(form.currentState?.validate() ?? false)) return;
@@ -939,7 +948,13 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
       }
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) showError(context, error);
+      if (mounted) {
+        if (widget.onError != null) {
+          widget.onError!(error);
+        } else {
+          showError(context, error);
+        }
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
